@@ -43,7 +43,13 @@ test('buildTokens draws headings, connectors and padding', () => {
     { id: 'b', group: 'w', name: 'b', status: 'working', tabs: '◐▫' },
   ];
   const t = buildTokens(rows);
-  assert.deepEqual(t.s, { sp_group: null, sp_tree: null, sp_name: 'solo', sp_tabs: '○' });
-  assert.deepEqual(t.a, { sp_group: '▾ w (2) !1 ◐1', sp_tree: '├', sp_name: 'a', sp_tabs: '!' });
-  assert.deepEqual(t.b, { sp_group: null, sp_tree: '⠀⠀└', sp_name: 'b', sp_tabs: '◐▫' });
+  const none = { sp_working: null, sp_blocked: null, sp_done: null, sp_idle: null, sp_unknown: null };
+  assert.deepEqual(t.s, { ...none, sp_group: null, sp_idle: '○ solo ○', sp_tree: null, sp_name: 'solo', sp_tabs: '○' });
+  assert.deepEqual(t.a, { ...none, sp_group: '▾ w (2) !1 ◐1', sp_blocked: '├─ ! a !', sp_tree: '├─', sp_name: 'a', sp_tabs: '!' });
+  assert.deepEqual(t.b, { ...none, sp_group: null, sp_working: '⠀⠀└─ ◐ b ◐▫', sp_tree: '⠀⠀└─', sp_name: 'b', sp_tabs: '◐▫' });
+});
+
+test('buildTokens files an unrecognised workspace status under unknown', () => {
+  const t = buildTokens([{ id: 'x', group: null, name: 'x', status: 'something-new', tabs: '' }]);
+  assert.equal(t.x.sp_unknown, '? x');
 });

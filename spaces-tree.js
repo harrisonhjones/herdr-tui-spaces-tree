@@ -14,7 +14,8 @@ const HERDR = process.env.HERDR_BIN_PATH || 'herdr';
 const SOCKET = process.env.HERDR_SOCKET_PATH;
 const STATE_DIR = process.env.HERDR_PLUGIN_STATE_DIR || path.join(__dirname, '.state');
 const SOURCE = 'spaces-tree';
-const TOKENS = ['sp_group', 'sp_tree', 'sp_name', 'sp_tabs'];
+const STATUSES = ['working', 'blocked', 'done', 'idle', 'unknown'];
+const TOKENS = ['sp_group', ...STATUSES.map((s) => 'sp_' + s), 'sp_tree', 'sp_name', 'sp_tabs'];
 // Same glyphs as herdr-tui-agent-tree, so both panels share one legend.
 const GLYPH = { working: '◐', blocked: '!', done: '✓', idle: '○', unknown: '?' };
 // A tab's glyph is its most urgent agent's state, in this order.
@@ -127,12 +128,16 @@ function tabStrips(snap) {
 }
 
 // Desired tokens per workspace from rows in Spaces order:
-//   [{ id, group, name, status, tabs }]  ->  { id: { sp_group, sp_tree, sp_name, sp_tabs } }
+//   [{ id, group, name, status, tabs }]  ->  { id: { sp_group, sp_<status>, sp_tree, sp_name, sp_tabs } }
 //
 //   ▾ work (3) !1 ◐2
-//   ├ · ◐ api ◐○▫
-//   ⠀⠀├ · ! web !
-//   ⠀⠀└ · ◐ db ◐◐
+//   ├─ ◐ api ◐○▫
+//   ⠀⠀├─ ! web !
+//   ⠀⠀└─ ◐ db ◐◐
+//
+// Exactly one sp_<status> token is set per workspace, holding the whole row, so the layout
+// can colour the row by status. sp_tree, sp_name and sp_tabs are the same row in parts, for
+// layouts that use herdr's own state_icon instead.
 //
 // The heading row is set only on a group's first workspace. The sidebar indents an entry's
 // first row by 1 and later rows by 3, so every grouped workspace except the one under the
@@ -142,11 +147,13 @@ function buildTokens(rows) {
   for (const r of rows) if (r.group !== null) members.set(r.group, [...(members.get(r.group) || []), r]);
   const out = {};
   for (const r of rows) {
-    const t = { sp_group: null, sp_tree: null, sp_name: r.name || null, sp_tabs: r.tabs || null };
+    const t = { sp_group: null };
+    for (const s of STATUSES) t['sp_' + s] = null;
+    Object.assign(t, { sp_tree: null, sp_name: r.name || null, sp_tabs: r.tabs || null });
     if (r.group !== null) {
       const mates = members.get(r.group);
       const first = mates[0] === r;
-      const branch = mates[mates.length - 1] === r ? '└' : '├';
+      const branch = mates[mates.length - 1] === r ? '└─' : '├─';
       t.sp_tree = first ? branch : PAD_CHAR.repeat(PAD) + branch;
       if (first) {
         const counts = COUNTED.map((s) => [s, mates.filter((m) => m.status === s).length])
@@ -154,6 +161,8 @@ function buildTokens(rows) {
         t.sp_group = [`▾ ${r.group} (${mates.length})`, ...counts].join(' ');
       }
     }
+    const status = STATUSES.includes(r.status) ? r.status : 'unknown';
+    t['sp_' + status] = [t.sp_tree, GLYPH[status], r.name, r.tabs].filter(Boolean).join(' ');
     out[r.id] = t;
   }
   return out;
@@ -253,8 +262,8 @@ function doctor() {
   for (const w of ordered) {
     const t = desired[w.workspace_id];
     if (t.sp_group) console.log(t.sp_group);
-    const tree = t.sp_tree ? `${t.sp_tree} · ` : '';
-    console.log(`  ${tree}[${w.agent_status}] ${t.sp_name || ''} ${t.sp_tabs || ''}   [${w.workspace_id}]`);
+    const status = STATUSES.find((s) => t['sp_' + s]);
+    console.log(`  ${t['sp_' + status]}   [${w.workspace_id} ${status}]`);
   }
 }
 

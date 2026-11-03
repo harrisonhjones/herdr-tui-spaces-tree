@@ -2,7 +2,7 @@ id = "harrisonhjones.herdr-tui-spaces-tree"
 name = "Herdr Spaces Tree"
 version = "0.1.0"
 min_herdr_version = "0.9.5"
-description = "Show the Spaces sidebar as a group -> workspace tree (\"group/name\" labels) with a strip of each workspace's tabs marked by agent state, by writing workspace metadata tokens ($sp_group, $sp_tree, $sp_name, $sp_tabs)."
+description = "Show the Spaces sidebar as a group -> workspace tree (\"group/name\" labels) with a strip of each workspace's tabs marked by agent state, by writing workspace metadata tokens ($sp_group, $sp_<status>)."
 platforms = ["linux", "macos", "windows"]
 
 # Every event runs the same idempotent full reconcile (spaces-tree.js); the event

@@ -8,9 +8,9 @@ workspace (stock herdr behaviour).
 ```
 ○ scratch ▫
 ▾ work (3) !1 ✓1 ◐1
-├ · ◐ billing-api ◐!✓▫
-  ├ · ! mobile-app !○
-  └ · ✓ docs-site ✓○◐?
+├─ ◐ billing-api ◐!✓▫
+  ├─ ! mobile-app !○
+  └─ ✓ docs-site ✓○◐?
 ```
 
 It is the Spaces counterpart of [herdr-tui-agent-tree](https://github.com/harrisonhjones/herdr-tui-agent-tree), and
@@ -33,16 +33,24 @@ The plugin cannot write client config, so add this yourself and run `herdr serve
 ```toml
 [ui.sidebar.spaces]
 rows = [
-  # Group heading, set only on the group's first workspace.
-  [{ token = "$sp_group", bold = true, dim = false, fg = "#CBA6F7" }],
-  # Connector, herdr's rolled-up state icon, the name without its group prefix, the tab strip.
-  [{ token = "$sp_tree", dim = false, fg = "#A6ADC8" }, "state_icon", { token = "$sp_name" }, { token = "$sp_tabs", dim = false, fg = "#CDD6F4" }],
+  ["$sp_group"],                 # set only on the first workspace of each group -> header row
+  [
+    { token = "$sp_working", fg = "#e5c07b" },
+    { token = "$sp_blocked", fg = "#e06c75" },
+    { token = "$sp_done",    fg = "#98c379" },
+    { token = "$sp_idle",    fg = "#9aa5b1" },
+    { token = "$sp_unknown", fg = "#7f848e" },
+  ],
 ]
 ```
 
-`$sp_tree` comes first on its row so that its alignment padding moves the icon and name with it. herdr joins it to
-`state_icon` with ` · `. herdr's git row (`["branch", "git_status"]`) is left out because it would sit in the tree's
-column.
+Exactly one `$sp_<status>` token is set per workspace, holding its whole row (connector, status glyph, name without
+the group prefix, tab strip), so exactly one is shown, in the colour of herdr's rolled-up workspace state. The colours
+match herdr-tui-agent-tree's.
+
+Optional: the plugin also writes the row in parts, `$sp_tree` (connector), `$sp_name` and `$sp_tabs`, so you can use
+herdr's own coloured status icon instead: `rows = [["$sp_group"], ["$sp_tree", "state_icon", "$sp_name", "$sp_tabs"]]`.
+herdr's git row (`["branch", "git_status"]`) is left out of both layouts because it would sit in the tree's column.
 
 ## Glyphs
 
@@ -87,8 +95,7 @@ and logged to the plugin's stderr.
 - Alignment: herdr indents an entry's first row by 1 and later rows by 3, and trims leading whitespace from token
   values. Grouped workspaces without a heading row are padded with `SPACES_TREE_PAD` (default 2) U+2800 characters so
   connectors line up. Override the character with `SPACES_TREE_PAD_CHAR`.
-- Without the plugin (or after `clear`) the Spaces rows show only herdr's state icon, because the layout's text comes
-  from plugin tokens.
+- Without the plugin (or after `clear`) the Spaces rows are blank, because the layout only shows plugin tokens.
 - Tests: `node --test`.
 - To uninstall cleanly: run `clear`, `herdr plugin unlink harrisonhjones.herdr-tui-spaces-tree`, and restore your
   config.
