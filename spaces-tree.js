@@ -16,7 +16,7 @@ const STATE_DIR = process.env.HERDR_PLUGIN_STATE_DIR || path.join(__dirname, '.s
 const SOURCE = 'spaces-tree';
 const STATUSES = ['working', 'blocked', 'done', 'idle', 'unknown'];
 const TOKENS = ['sp_group', ...STATUSES.map((s) => 'sp_' + s), 'sp_tree', 'sp_name', 'sp_tabs'];
-// Same glyphs as herdr-tui-agent-tree, so both panels share one legend.
+// Same glyphs as herdr-tui-agents-tree, so both panels share one legend.
 const GLYPH = { working: '◐', blocked: '!', done: '✓', idle: '○', unknown: '?' };
 // A tab's glyph is its most urgent agent's state, in this order.
 const URGENCY = ['blocked', 'done', 'working', 'idle', 'unknown'];
