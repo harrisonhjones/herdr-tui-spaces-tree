@@ -13,7 +13,7 @@ workspace (stock herdr behaviour).
   └─ ✓ docs-site ✓○◐?
 ```
 
-It is the Spaces counterpart of [herdr-tui-agent-tree](https://github.com/harrisonhjones/herdr-tui-agent-tree), and
+It is the Spaces counterpart of [herdr-tui-agents-tree](https://github.com/harrisonhjones/herdr-tui-agents-tree), and
 the two run side by side: each writes its own tokens under its own source, so neither one's `clear` touches the other.
 
 Requires herdr >= 0.9.5 and Node (any recent version) on PATH. It is pure Node and calls herdr through
@@ -46,7 +46,7 @@ rows = [
 
 Exactly one `$sp_<status>` token is set per workspace, holding its whole row (connector, status glyph, name without
 the group prefix, tab strip), so exactly one is shown, in the colour of herdr's rolled-up workspace state. The colours
-match herdr-tui-agent-tree's.
+match herdr-tui-agents-tree's.
 
 Optional: the plugin also writes the row in parts, `$sp_tree` (connector), `$sp_name` and `$sp_tabs`, so you can use
 herdr's own coloured status icon instead: `rows = [["$sp_group"], ["$sp_tree", "state_icon", "$sp_name", "$sp_tabs"]]`.
@@ -56,7 +56,7 @@ herdr's git row (`["branch", "git_status"]`) is left out of both layouts because
 
 - Tab strip: one glyph per tab in tab order, showing its most urgent agent (blocked, then done, working, idle,
   unknown). `▫` is a tab with no agent.
-- `◐` working, `!` blocked, `✓` done, `○` idle, `?` unknown, the same set herdr-tui-agent-tree uses.
+- `◐` working, `!` blocked, `✓` done, `○` idle, `?` unknown, the same set herdr-tui-agents-tree uses.
 - Group heading: `▾ <group> (<workspaces>)`, then a count for each of blocked, done and working that any workspace in
   the group is in, from herdr's rolled-up workspace state.
 

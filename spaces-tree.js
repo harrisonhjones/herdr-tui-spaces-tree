@@ -16,7 +16,7 @@ const STATE_DIR = process.env.HERDR_PLUGIN_STATE_DIR || path.join(__dirname, '.s
 const SOURCE = 'spaces-tree';
 const STATUSES = ['working', 'blocked', 'done', 'idle', 'unknown'];
 const TOKENS = ['sp_group', ...STATUSES.map((s) => 'sp_' + s), 'sp_tree', 'sp_name', 'sp_tabs'];
-// Same glyphs as herdr-tui-agent-tree, so both panels share one legend.
+// Same glyphs as herdr-tui-agents-tree, so both panels share one legend.
 const GLYPH = { working: '◐', blocked: '!', done: '✓', idle: '○', unknown: '?' };
 // A tab's glyph is its most urgent agent's state, in this order.
 const URGENCY = ['blocked', 'done', 'working', 'idle', 'unknown'];
@@ -47,8 +47,21 @@ const LOCK = path.join(STATE_DIR, 'lock');
 const DIRTY = path.join(STATE_DIR, 'dirty');
 const DEMO = path.join(STATE_DIR, 'demo'); // while present, workspaces are shown with fake groups/names/tabs
 
+// main() treats a lock older than LOCK_STALE_MS as abandoned and takes it over. Every herdr
+// call and socket request is bounded by what's left of RUN_BUDGET_MS from process start, so
+// a run always ends before its lock can be taken over, and two runs never write at once.
+// That ordering is what lets writes go without --seq.
+const LOCK_STALE_MS = 30000;
+const RUN_BUDGET_MS = 25000;
+const DEADLINE = Date.now() + RUN_BUDGET_MS;
+function remainingMs() {
+  const ms = DEADLINE - Date.now();
+  if (ms <= 0) throw new Error(`run exceeded its ${RUN_BUDGET_MS} ms budget`);
+  return ms;
+}
+
 function herdr(args, { json = true } = {}) {
-  const r = spawnSync(HERDR, args, { encoding: 'utf8', windowsHide: true });
+  const r = spawnSync(HERDR, args, { encoding: 'utf8', windowsHide: true, timeout: remainingMs() });
   if (r.error) throw r.error;
   if (r.status !== 0) throw new Error(`herdr ${args.join(' ')} failed: ${(r.stderr || r.stdout).trim()}`);
   return json ? JSON.parse(r.stdout) : r.stdout;
@@ -58,9 +71,12 @@ function herdr(args, { json = true } = {}) {
 function request(method, params) {
   return new Promise((resolve, reject) => {
     if (!SOCKET) return reject(new Error('HERDR_SOCKET_PATH is not set'));
+    const timeout = Math.min(10000, remainingMs());
     const conn = net.createConnection(SOCKET);
     let buf = '';
-    conn.setTimeout(10000, () => conn.destroy(new Error(`${method} timed out`)));
+    // setTimeout only fires on idle time; the timer below caps the request's total time.
+    const timer = setTimeout(() => conn.destroy(new Error(`${method} timed out`)), timeout);
+    conn.on('close', () => clearTimeout(timer));
     conn.on('connect', () => conn.write(JSON.stringify({ id: SOURCE, method, params }) + '\n'));
     conn.on('data', (d) => {
       buf += d;
@@ -215,8 +231,8 @@ async function regroup(workspaces) {
   return want.map((id) => byId.get(id));
 }
 
-function writeTokens(wsId, tokens, seq) {
-  const args = ['workspace', 'report-metadata', wsId, '--source', SOURCE, '--seq', String(seq)];
+function writeTokens(wsId, tokens) {
+  const args = ['workspace', 'report-metadata', wsId, '--source', SOURCE];
   for (const [k, v] of Object.entries(tokens)) {
     if (v === null) args.push('--clear-token', k);
     else args.push('--token', `${k}=${v}`);
@@ -243,8 +259,11 @@ async function reconcile() {
     const tokens = desired[w.workspace_id] || clearAll;
     const sig = JSON.stringify(tokens);
     if (prev[w.workspace_id] === sig) { next[w.workspace_id] = sig; continue; }
-    try { writeTokens(w.workspace_id, tokens, Date.now()); writes++; next[w.workspace_id] = sig; }
-    catch (e) { console.error(String(e.message)); }
+    try { writeTokens(w.workspace_id, tokens); writes++; next[w.workspace_id] = sig; }
+    catch (e) {
+      console.error(String(e.message));
+      if (DEADLINE <= Date.now()) break; // out of budget; the unwritten workspaces retry next run
+    }
   }
   fs.writeFileSync(STATE_FILE, JSON.stringify(next));
   return { writes, workspaces: workspaces.length };
@@ -277,7 +296,7 @@ async function main() {
   try { fs.mkdirSync(LOCK); held = true; }
   catch {
     try {
-      if (Date.now() - fs.statSync(LOCK).mtimeMs > 30000) { fs.rmdirSync(LOCK); fs.mkdirSync(LOCK); held = true; }
+      if (Date.now() - fs.statSync(LOCK).mtimeMs > LOCK_STALE_MS) { fs.rmdirSync(LOCK); fs.mkdirSync(LOCK); held = true; }
     } catch { /* lost the race */ }
   }
   if (!held) { try { fs.writeFileSync(DIRTY, '1'); } catch {} return; }
@@ -288,7 +307,7 @@ async function main() {
       const r = await reconcile();
       if (rounds === 0) console.log(`[${mode}] workspaces=${r.workspaces} writes=${r.writes}`);
       rounds++;
-    } while (fs.existsSync(DIRTY) && rounds < 5);
+    } while (fs.existsSync(DIRTY) && rounds < 5 && DEADLINE > Date.now());
   } finally {
     try { fs.rmdirSync(LOCK); } catch {}
   }
