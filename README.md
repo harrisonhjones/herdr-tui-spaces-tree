@@ -16,9 +16,9 @@ workspace (stock herdr behaviour).
 It is the Spaces counterpart of [herdr-tui-agents-tree](https://github.com/harrisonhjones/herdr-tui-agents-tree), and
 the two run side by side: each writes its own tokens under its own source, so neither one's `clear` touches the other.
 
-Requires herdr >= 0.9.5 and Node (any recent version) on PATH. It is pure Node and calls herdr through
-`HERDR_BIN_PATH` and `HERDR_SOCKET_PATH`. Tested on Linux, not yet Windows or macOS. Config path outside Windows:
-`~/.config/herdr/config.toml`.
+Requires herdr >= 0.9.5 and Node (any recent version) on PATH. It is pure Node and calls herdr through `HERDR_BIN_PATH`
+and `HERDR_SOCKET_PATH`. Unit tests run in CI on Linux, Windows and macOS. Used with a live herdr on Linux, not yet
+Windows or macOS. Config path outside Windows: `~/.config/herdr/config.toml`.
 
 ## Install
 
