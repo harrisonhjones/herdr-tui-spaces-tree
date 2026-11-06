@@ -36,8 +36,12 @@ const mode = process.argv[2] || 'refresh';
 // regroup (default true) reorders the Spaces list so each group's workspaces sit together.
 const CONFIG_DIR = process.env.HERDR_PLUGIN_CONFIG_DIR || __dirname;
 function readConfig() {
-  try { return JSON.parse(fs.readFileSync(path.join(CONFIG_DIR, 'config.json'), 'utf8')); }
-  catch (e) { if (e.code !== 'ENOENT') process.stderr.write(`config.json ignored: ${e.message}\n`); return {}; }
+  try {
+    return JSON.parse(fs.readFileSync(path.join(CONFIG_DIR, 'config.json'), 'utf8'));
+  } catch (e) {
+    if (e.code !== 'ENOENT') process.stderr.write(`config.json ignored: ${e.message}\n`);
+    return {};
+  }
 }
 const REGROUP = readConfig().regroup !== false;
 
@@ -86,7 +90,9 @@ function request(method, params) {
         const reply = JSON.parse(buf);
         if (reply.error) reject(new Error(`${method} failed: ${JSON.stringify(reply.error)}`));
         else resolve(reply.result);
-      } catch (e) { reject(e); }
+      } catch (e) {
+        reject(e);
+      }
     });
     conn.on('error', reject);
   });
@@ -116,7 +122,8 @@ function groupedOrder(workspaces) {
   }
   const anchor = new Map();
   runs.forEach((r, i) => {
-    if (r.group !== null && (!anchor.has(r.group) || r.ids.length > runs[anchor.get(r.group)].ids.length)) anchor.set(r.group, i);
+    if (r.group !== null && (!anchor.has(r.group) || r.ids.length > runs[anchor.get(r.group)].ids.length))
+      anchor.set(r.group, i);
   });
   const order = runs.filter((r) => r.group === null).flatMap((r) => r.ids);
   runs.forEach((r, i) => {
@@ -173,7 +180,8 @@ function buildTokens(rows) {
       t.sp_tree = first ? branch : PAD_CHAR.repeat(PAD) + branch;
       if (first) {
         const counts = COUNTED.map((s) => [s, mates.filter((m) => m.status === s).length])
-          .filter(([, n]) => n > 0).map(([s, n]) => `${GLYPH[s]}${n}`);
+          .filter(([, n]) => n > 0)
+          .map(([s, n]) => `${GLYPH[s]}${n}`);
         t.sp_group = [`▾ ${r.group} (${mates.length})`, ...counts].join(' ');
       }
     }
@@ -207,9 +215,14 @@ function demoRows(workspaces) {
 function desiredTokens(snap, workspaces) {
   if (fs.existsSync(DEMO)) return buildTokens(demoRows(workspaces));
   const strips = tabStrips(snap);
-  return buildTokens(workspaces.map((w) => ({
-    id: w.workspace_id, ...parseLabel(w.label), status: w.agent_status, tabs: strips.get(w.workspace_id) || '',
-  })));
+  return buildTokens(
+    workspaces.map((w) => ({
+      id: w.workspace_id,
+      ...parseLabel(w.label),
+      status: w.agent_status,
+      tabs: strips.get(w.workspace_id) || '',
+    })),
+  );
 }
 
 function snapshot() {
@@ -225,8 +238,12 @@ function snapshot() {
 async function regroup(workspaces) {
   const want = groupedOrder(workspaces);
   if (want.every((id, i) => id === workspaces[i].workspace_id)) return workspaces;
-  try { await request('workspace.move_block', { workspace_ids: want }); }
-  catch (e) { console.error(String(e.message)); return workspaces; }
+  try {
+    await request('workspace.move_block', { workspace_ids: want });
+  } catch (e) {
+    console.error(String(e.message));
+    return workspaces;
+  }
   const byId = new Map(workspaces.map((w) => [w.workspace_id, w]));
   return want.map((id) => byId.get(id));
 }
@@ -241,7 +258,11 @@ function writeTokens(wsId, tokens) {
 }
 
 function loadState() {
-  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch { return {}; }
+  try {
+    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+  } catch {
+    return {};
+  }
 }
 
 async function reconcile() {
@@ -258,9 +279,15 @@ async function reconcile() {
   for (const w of workspaces) {
     const tokens = desired[w.workspace_id] || clearAll;
     const sig = JSON.stringify(tokens);
-    if (prev[w.workspace_id] === sig) { next[w.workspace_id] = sig; continue; }
-    try { writeTokens(w.workspace_id, tokens); writes++; next[w.workspace_id] = sig; }
-    catch (e) {
+    if (prev[w.workspace_id] === sig) {
+      next[w.workspace_id] = sig;
+      continue;
+    }
+    try {
+      writeTokens(w.workspace_id, tokens);
+      writes++;
+      next[w.workspace_id] = sig;
+    } catch (e) {
       console.error(String(e.message));
       if (DEADLINE <= Date.now()) break; // out of budget; the unwritten workspaces retry next run
     }
@@ -277,7 +304,9 @@ function doctor() {
   const ordered = REGROUP ? want.map((id) => byId.get(id)) : workspaces;
   const desired = desiredTokens(snap, ordered);
   const moved = want.some((id, i) => id !== workspaces[i].workspace_id);
-  console.log(`regroup=${REGROUP} demo=${fs.existsSync(DEMO)}` + (REGROUP && moved ? ' (Spaces order would change)' : ''));
+  console.log(
+    `regroup=${REGROUP} demo=${fs.existsSync(DEMO)}` + (REGROUP && moved ? ' (Spaces order would change)' : ''),
+  );
   for (const w of ordered) {
     const t = desired[w.workspace_id];
     if (t.sp_group) console.log(t.sp_group);
@@ -289,30 +318,55 @@ function doctor() {
 async function main() {
   if (mode === 'doctor') return doctor();
   if (mode === 'demo') fs.writeFileSync(DEMO, '1');
-  if (mode === 'demo-off') { try { fs.unlinkSync(DEMO); } catch {} }
+  if (mode === 'demo-off') {
+    try {
+      fs.unlinkSync(DEMO);
+    } catch {}
+  }
   // Serialize runs: events arrive in bursts. A losing run flags "dirty" and exits;
   // the lock holder loops until no further events arrived.
   let held = false;
-  try { fs.mkdirSync(LOCK); held = true; }
-  catch {
+  try {
+    fs.mkdirSync(LOCK);
+    held = true;
+  } catch {
     try {
-      if (Date.now() - fs.statSync(LOCK).mtimeMs > LOCK_STALE_MS) { fs.rmdirSync(LOCK); fs.mkdirSync(LOCK); held = true; }
-    } catch { /* lost the race */ }
+      if (Date.now() - fs.statSync(LOCK).mtimeMs > LOCK_STALE_MS) {
+        fs.rmdirSync(LOCK);
+        fs.mkdirSync(LOCK);
+        held = true;
+      }
+    } catch {
+      /* lost the race */
+    }
   }
-  if (!held) { try { fs.writeFileSync(DIRTY, '1'); } catch {} return; }
+  if (!held) {
+    try {
+      fs.writeFileSync(DIRTY, '1');
+    } catch {}
+    return;
+  }
   try {
     let rounds = 0;
     do {
-      try { fs.unlinkSync(DIRTY); } catch {}
+      try {
+        fs.unlinkSync(DIRTY);
+      } catch {}
       const r = await reconcile();
       if (rounds === 0) console.log(`[${mode}] workspaces=${r.workspaces} writes=${r.writes}`);
       rounds++;
     } while (fs.existsSync(DIRTY) && rounds < 5 && DEADLINE > Date.now());
   } finally {
-    try { fs.rmdirSync(LOCK); } catch {}
+    try {
+      fs.rmdirSync(LOCK);
+    } catch {}
   }
 }
 
-if (require.main === module) main().catch((e) => { console.error(String(e.stack || e)); process.exit(1); });
+if (require.main === module)
+  main().catch((e) => {
+    console.error(String(e.stack || e));
+    process.exit(1);
+  });
 // Exported for test.js.
 module.exports = { parseLabel, groupedOrder, tabStrips, buildTokens };

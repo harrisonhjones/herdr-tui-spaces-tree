@@ -27,9 +27,14 @@ test('groupedOrder keeps an already grouped list unchanged', () => {
 
 test('tabStrips shows the most urgent agent per tab and a shell mark for empty tabs', () => {
   const snap = {
-    tabs: [{ tab_id: 't1', workspace_id: 'w' }, { tab_id: 't2', workspace_id: 'w' }, { tab_id: 't3', workspace_id: 'w' }],
+    tabs: [
+      { tab_id: 't1', workspace_id: 'w' },
+      { tab_id: 't2', workspace_id: 'w' },
+      { tab_id: 't3', workspace_id: 'w' },
+    ],
     agents: [
-      { tab_id: 't1', agent_status: 'idle' }, { tab_id: 't1', agent_status: 'blocked' },
+      { tab_id: 't1', agent_status: 'idle' },
+      { tab_id: 't1', agent_status: 'blocked' },
       { tab_id: 't3', agent_status: 'something-new' },
     ],
   };
@@ -45,8 +50,22 @@ test('buildTokens draws headings, connectors and padding', () => {
   const t = buildTokens(rows);
   const none = { sp_working: null, sp_blocked: null, sp_done: null, sp_idle: null, sp_unknown: null };
   assert.deepEqual(t.s, { ...none, sp_group: null, sp_idle: '○ solo ○', sp_tree: null, sp_name: 'solo', sp_tabs: '○' });
-  assert.deepEqual(t.a, { ...none, sp_group: '▾ w (2) !1 ◐1', sp_blocked: '├─ ! a !', sp_tree: '├─', sp_name: 'a', sp_tabs: '!' });
-  assert.deepEqual(t.b, { ...none, sp_group: null, sp_working: '⠀⠀└─ ◐ b ◐▫', sp_tree: '⠀⠀└─', sp_name: 'b', sp_tabs: '◐▫' });
+  assert.deepEqual(t.a, {
+    ...none,
+    sp_group: '▾ w (2) !1 ◐1',
+    sp_blocked: '├─ ! a !',
+    sp_tree: '├─',
+    sp_name: 'a',
+    sp_tabs: '!',
+  });
+  assert.deepEqual(t.b, {
+    ...none,
+    sp_group: null,
+    sp_working: '⠀⠀└─ ◐ b ◐▫',
+    sp_tree: '⠀⠀└─',
+    sp_name: 'b',
+    sp_tabs: '◐▫',
+  });
 });
 
 test('buildTokens files an unrecognised workspace status under unknown', () => {
